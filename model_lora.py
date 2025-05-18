@@ -9,6 +9,7 @@ from peft import LoraConfig, get_peft_model
 from evaluate import load
 import wandb
 from IPython.display import display
+import matplotlib.pyplot as plt
 
 # CONFIG
 model_name = "google/paligemma-3b-pt-224"
@@ -70,6 +71,7 @@ wandb.config.update({
 
 print(f"Train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}")
 
+
 # DATASET
 class RISCDataset(Dataset):
     def __init__(self, df, processor, max_length=128):
@@ -86,8 +88,6 @@ class RISCDataset(Dataset):
 
         prompt = "caption en: <image>"
         caption = row["caption"]
-
-        # Use suffix=caption (like the notebook)
         inputs = self.processor(
             images=image,
             text=prompt,
@@ -107,12 +107,10 @@ class RISCDataset(Dataset):
 # LOAD MODEL WITH LoRA
 print(" Loading base model with LoRA...")
 
-from peft import LoraConfig, get_peft_model
-
 # Load processor
 processor = AutoProcessor.from_pretrained(model_name)
 
-# Define LoRA configuration (same as notebook)
+# Define LoRA configuration
 lora_config = LoraConfig(
     r=4,
     lora_alpha=8,
@@ -135,13 +133,11 @@ base_model = PaliGemmaForConditionalGeneration.from_pretrained(
 model = get_peft_model(base_model, lora_config)
 model.print_trainable_parameters()
 
-
 # TRAINING
 train_dataset = RISCDataset(train_df, processor, max_length)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
-
 model.train()
 
 for epoch in range(num_epochs):
@@ -166,6 +162,7 @@ model.save_pretrained(save_dir)
 processor.save_pretrained(save_dir)
 print(f"Model + LoRA saved locally to: {save_dir}")
 
+######################################################
 
 # EVALUATION
 bleu = load("bleu")
@@ -215,8 +212,6 @@ def evaluate_split(split_df, split_name):
 # RUN EVALUATION
 evaluate_split(val_df, "val")
 evaluate_split(test_df, "test")
-
-import matplotlib.pyplot as plt
 
 def visualize_predictions(split_df, split_name, num_samples=2):
     model.eval()
